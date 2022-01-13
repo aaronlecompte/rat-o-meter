@@ -1,1 +1,156 @@
-<h1>Hello!</h1>
+<!doctype html>
+<head>
+<title>RAT-o-meter: Rapid Antigen Test availability levels across Australia</title>
+<script
+  src="https://code.jquery.com/jquery-3.6.0.min.js"
+  integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
+  crossorigin="anonymous"></script>
+<script src="https://unpkg.com/dayjs@1.8.36/dayjs.min.js"></script>
+<script src="https://unpkg.com/dayjs@1.8.36/plugin/utc.js"></script>
+<script src="https://unpkg.com/dayjs@1.8.36/plugin/timezone.js"></script>
+<script src="https://unpkg.com/dayjs@1.8.36/plugin/relativeTime.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/handlebars@latest/dist/handlebars.js"></script>
+</head>
+<body>
+    <h1>Rat-o-meter</h1>
+    <h3>Rapid Antigen Test availability levels across Australia</h3>
+    <p>Data sourced from <a href="https://findarat.com.au" target="_blank">https://findarat.com.au</a></p>
+    <p>Last updated: <span id="last-updated"></span></p>
+    <div class="content">
+        <h3>Metropolitan locations</h3>
+        <table>
+            <thead>
+                <tr>
+                    <td>City</td>
+                    <td>Num. stockists</td>
+                    <td>Locations currently in stock</td>
+                    <td>Locations with stock in last 24 hours</td>
+                    <td>Time for stock to run out</td>
+                    <td>25th-75th percentile range</td>
+                </tr>
+            </thead>
+            <tbody id="table-body-metro">
+
+            </tbody>
+        </table>
+
+        <h3>Non-metro locations</h3>
+        <table>
+            <thead>
+                <tr>
+                    <td>State</td>
+                    <td>Num. stockists</td>
+                    <td>Locations currently in stock</td>
+                    <td>Locations with stock in last 24 hours</td>
+                </tr>
+            </thead>
+            <tbody id="table-body-regional">
+
+            </tbody>
+        </table>
+
+        <p>
+            Notes:
+        </p>
+        <ul>
+
+            <li>
+                Metropolitan defined as locations within a 50km radius of city centre
+            </li>
+            <li>
+                Out-of-stock times measured as time from most recent restocking event to location being reported as out of stock. One measurement is recorded for each location and the median result is presented.
+            </li>
+            <li>
+                Locations classified by address entered by users.
+            </li>
+            <li>
+                Stock levels are reported by members of the public on a voluntary basis. This may not reflect actual stock levels at any location, and the metric measured here reflect information as available on findarat.com.au.
+            </li>
+            <li>
+                Disclaimer: All measurements are based on data entered by members of the public into findarat.com.au and not validation of data has been performed. No warranty is expressed or implied on the accuracy of this data and/or analysis for any particular purpose.
+            </li>
+            <li>(c) 2022 Aaron Le Compte. Source: <a href="https://github.com/aaronlecompte/rat-o-meter" target="_blank">GitHub</a></li>
+        </ul>
+    </div>
+    <script type="text/javascript">
+        $(document).ready(function() {
+
+            dayjs.extend(window.dayjs_plugin_utc)
+            dayjs.extend(window.dayjs_plugin_timezone)
+            dayjs.extend(window.dayjs_plugin_relativeTime)
+
+
+            // compile the template
+            var tableRow = Handlebars.compile(`
+            <tr>
+                <td>{{ geo_city }}</td>
+                <td>{{ num_addresses }}</td>
+                <td>{{ percent_in_stock }}%</td>
+                <td>{{ percent_had_stock_last_24h }}%</td>
+                <td>{{ out_of_stock_time_mins_median }} minutes</td>
+                <td>{{ out_of_stock_time_mins_prc25 }} to {{ out_of_stock_time_mins_prc75 }} minutes</td>
+            </tr>
+            `);
+
+            var tableRowNonMetro = Handlebars.compile(`
+            <tr>
+                <td>{{ geo_state }}</td>
+                <td>{{ num_addresses }}</td>
+                <td>{{ percent_in_stock }}%</td>
+                <td>{{ percent_had_stock_last_24h }}%</td>
+            </tr>
+            `);
+
+            function indexData(data)
+            {
+                // Generate an indexed version of the data array
+                // to aid custom sorting and filtering
+                dataMap = {}
+                for (i=0; i<data.length; i++) {
+                    if (!(data[i]['geo_state'] in dataMap)) {
+                        dataMap[data[i]['geo_state']] = {}
+                    }
+                    dataMap[data[i]['geo_state']][data[i]['geo_city']] = data[i]
+                }
+                return dataMap
+            }
+
+            $.ajax({
+                url: 'https://d5otgg5z3fzzs.cloudfront.net/data/latest.json',
+                success: function(dataRaw) {
+                    data = JSON.parse(dataRaw)
+                    updatedTime = dayjs.tz(data[0].query_time, 'UTC')
+                    document.getElementById('last-updated').innerHTML = updatedTime.fromNow()
+
+                    dataMap = indexData(data)
+
+                    dataMetro = [
+                        dataMap['NSW']['Sydney'],
+                        dataMap['VIC']['Melbourne'],
+                        dataMap['QLD']['Brisbane'],
+                        dataMap['SA']['Adelaide'],
+                        dataMap['WA']['Perth'],
+                        dataMap['ACT']['Canberra']
+                    ]
+                    tableRows = dataMetro.map(tableRow)
+                    tableRowsHtml = tableRows.reduce((a, b) => a + '\n' + b)
+                    document.getElementById('table-body-metro').innerHTML = tableRowsHtml
+
+                    dataNonMetro = [
+                        dataMap['NSW']['Other'],
+                        dataMap['VIC']['Other'],
+                        dataMap['QLD']['Other'],
+                        dataMap['SA']['Other'],
+                        dataMap['WA']['Other']
+                    ]
+                    tableRowsNonMetro = dataNonMetro.map(tableRowNonMetro)
+                    tableRowsNonMetroHtml = tableRowsNonMetro.reduce((a, b) => a + '\n' + b)
+                    document.getElementById('table-body-regional').innerHTML = tableRowsNonMetroHtml
+
+                }
+            })
+
+        })
+    </script>
+</body>
+</html>
