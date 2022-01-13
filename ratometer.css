@@ -1,0 +1,68 @@
+.rt-splash {
+    background: #dcc48e;
+    width: 100%;
+    height: 88%;
+    padding-top: 3em;
+    padding-bottom: 3em;
+    text-align: center;
+    color: #27233A;
+}
+
+.home-menu {
+    padding: 0.5em;
+    box-shadow: 0 1px 1px rgba(0,0,0, 0.10);
+}
+.home-menu {
+    background: #2d3e50;
+}
+
+.rt-heading {
+    color: white;
+    font-weight: 400;
+    font-size: 150%;
+}
+
+.home-menu .rt-subheading {
+    color: white;
+    text-align: right;
+    line-height: 1.75em;
+}
+
+.rt-splash table {
+    width: 88%;
+    margin: 0 auto;
+}
+
+.rt-splash td {
+        font-size: 150%;
+ font-weight: bold;
+ color: #27233a;
+}
+
+.rt-splash h1 {
+    color: #27233a;
+    margin-bottom: 0.1em;
+}
+
+.content-wrapper.rt-more-info,
+.content-wrapper.rt-notes {
+    margin-left: 2em;
+    margin-right: 2em;
+}
+
+.rt-notes-bg {
+    background: #eaefd3;
+    color: #27233a;
+    padding-top: 1em;
+    padding-bottom: 3em;
+    margin-top: 3em;
+}
+
+@media (min-width: 48em) {
+    .content-wrapper.rt-more-info,
+    .content-wrapper.rt-notes {
+        margin-left: 10em;
+        margin-right: 10em;
+    }
+}
+

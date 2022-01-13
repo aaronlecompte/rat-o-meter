@@ -1,4 +1,5 @@
 <!doctype html>
+<html lang="en">
 <head>
 <title>RAT-o-meter: Rapid Antigen Test availability levels across Australia</title>
 <script
@@ -11,22 +12,61 @@
 <script src="https://unpkg.com/dayjs@1.8.36/plugin/relativeTime.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/handlebars@latest/dist/handlebars.js"></script>
 <script src="pureknob.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/purecss@2.0.6/build/pure-min.css" integrity="sha384-Uu6IeWbM+gzNVXJcM9XV3SohHtmWE+3VGi496jvgX1jyvDTXfdK+rfZc8C1Aehk5" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/purecss@2.0.6/build/grids-responsive-min.css">
+<link rel="stylesheet" href="ratometer.css">
 </head>
 <body>
-    <h1>Rat-o-meter</h1>
-    <h3>Rapid Antigen Test availability levels across Australia</h3>
-    <p>Data sourced from <a href="https://findarat.com.au" target="_blank">https://findarat.com.au</a></p>
-    <p>Last updated: <span id="last-updated"></span></p>
-    <div class="content">
+    <div class="header">
+        <div class="home-menu pure-menu pure-menu-horizontal">
+            <div class="pure-g">
+                <div class="pure-u-1-2 rt-heading">RAT-o-meter</div>
+                <div class="pure-u-1-2 rt-subheading">Rapid Antigen Test availability levels across Australia</div>
+            </div>
+            
+       </div>
+    </div>
+
+    <div class="content-wrapper rt-splash">
+        <h1>Locations with RATs currently in stock</h1>
+        <p style="margin-top: 0.1em; margin-bottom: 0.1em;">Last updated: <span id="last-updated"></span></p>
+        <p style="margin-top: 0.1em; margin-bottom: 2em;">Data sourced from <a href="https://findarat.com.au" target="_blank">https://findarat.com.au</a></p>
+        
+        <table> 
+            <tr>
+                <td>Sydney</td>
+                <td>Melbourne</td>
+                <td>Brisbane</td>
+            </tr>
+            <tr>
+                <td id="gauge-Sydney-NSW"></td>
+                <td id="gauge-Melbourne-VIC"></td>
+                <td id="gauge-Brisbane-QLD"></td>
+            </tr>
+            <tr>
+                <td>Adelaide</td>
+                <td>Canberra</td>
+                <td>Perth</td>
+            </tr>
+            <tr>
+                <td id="gauge-Adelaide-SA"></td>
+                <td id="gauge-Canberra-ACT"></td>
+                <td id="gauge-Perth-WA"></td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="content-wrapper rt-more-info">
+        <h1>More information</h1>
+
         <h3>Metropolitan locations</h3>
-        <table>
+        <table class="pure-table pure-table-bordered">
             <thead>
                 <tr>
                     <td>City</td>
                     <td>Num. stockists</td>
-                    <td>Locations currently in stock</td>
-                    <td>Time for stock to run out</td>
-                    <td>25th-75th percentile range</td>
+                    <td>Time for stock to run out: Median</td>
+                    <td>Time for stock to run out: IQR</td>
                     <td>Locations with stock in last 24 hours</td>
                 </tr>
             </thead>
@@ -36,7 +76,7 @@
         </table>
 
         <h3>Non-metro locations</h3>
-        <table>
+        <table class="pure-table pure-table-bordered">
             <thead>
                 <tr>
                     <td>State</td>
@@ -50,9 +90,12 @@
             </tbody>
         </table>
 
-        <p>
-            Notes:
-        </p>
+    </div>
+
+<div class="rt-notes-bg">
+    <div class="content-wrapper rt-notes">
+
+        <h1>Notes</h1>
         <ul>
 
             <li>
@@ -73,6 +116,9 @@
             <li>(c) 2022 Aaron Le Compte. Source: <a href="https://github.com/aaronlecompte/rat-o-meter" target="_blank">GitHub</a></li>
         </ul>
     </div>
+</div>
+
+    
     <script type="text/javascript">
         $(document).ready(function() {
 
@@ -80,13 +126,17 @@
             dayjs.extend(window.dayjs_plugin_timezone)
             dayjs.extend(window.dayjs_plugin_relativeTime)
 
+            gaugeSize = 200;
+            if ($(window).width() < 700) {
+                gaugeSize = 100;
+            }
+
 
             // compile the template
             var tableRow = Handlebars.compile(`
             <tr>
                 <td>{{ geo_city }}</td>
                 <td>{{ num_addresses }}</td>
-                <td id="gauge-{{ geo_city }}-{{geo_state}}"></td>
                 <td>{{ out_of_stock_time_mins_median }} minutes</td>
                 <td>{{ out_of_stock_time_mins_prc25 }} to {{ out_of_stock_time_mins_prc75 }} minutes</td>
                 <td>{{ percent_had_stock_last_24h_round }}%</td>
@@ -97,7 +147,7 @@
             <tr>
                 <td>{{ geo_state }}</td>
                 <td>{{ num_addresses }}</td>
-                <td id="gauge-{{ geo_city }}-{{geo_state}}"></td>
+                <td>{{ percent_in_stock_round }}%</td>
                 <td>{{ percent_had_stock_last_24h_round }}%</td>
             </tr>
             `);
@@ -113,17 +163,19 @@
                     }
                     dataMap[data[i]['geo_state']][data[i]['geo_city']] = data[i]
                     data[i]['percent_had_stock_last_24h_round'] = Math.round(data[i]['percent_had_stock_last_24h'])
+                    data[i]['percent_in_stock_round'] = Math.round(data[i]['percent_in_stock'])
                 }
                 return dataMap
             }
 
             function addGauge(row) {
-                const knob = pureknob.createKnob(100, 100)
-                knob.setProperty('angleStart', -0.75 * Math.PI);
-                knob.setProperty('angleEnd', 0.75 * Math.PI);
-                knob.setProperty('colorFG', '#3333ff');
-                knob.setProperty('colorBG', '#aaaaaa');
-                knob.setProperty('trackWidth', 0.4);
+
+                const knob = pureknob.createKnob(gaugeSize, gaugeSize)
+                knob.setProperty('angleStart', -0.66 * Math.PI);
+                knob.setProperty('angleEnd', 0.66 * Math.PI);
+                knob.setProperty('colorFG', '#505168');
+                knob.setProperty('colorBG', '#dddddd');
+                knob.setProperty('trackWidth', 0.3);
                 knob.setProperty('valMin', 0);
                 knob.setProperty('valMax', 100);
                 knob.setProperty('readonly', true);
@@ -136,7 +188,7 @@
             }
 
             $.ajax({
-                url: 'https://d5otgg5z3fzzs.cloudfront.net/data/latest.json',
+                url: 'https://ratometer-public.s3.ap-southeast-2.amazonaws.com/data/latest.json?dt=' + (new Date()).getTime(),
                 success: function(dataRaw) {
                     data = JSON.parse(dataRaw)
                     updatedTime = dayjs.tz(data[0].query_time, 'UTC')
@@ -171,11 +223,6 @@
                     tableRowsNonMetro = dataNonMetro.map(tableRowNonMetro)
                     tableRowsNonMetroHtml = tableRowsNonMetro.reduce((a, b) => a + '\n' + b)
                     document.getElementById('table-body-regional').innerHTML = tableRowsNonMetroHtml
-
-                    // Add gauges
-                    for (i=0; i < dataNonMetro.length; i++) {
-                        addGauge(dataNonMetro[i])
-                    }
 
                 }
             })
