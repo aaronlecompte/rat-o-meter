@@ -10,6 +10,7 @@
 <script src="https://unpkg.com/dayjs@1.8.36/plugin/timezone.js"></script>
 <script src="https://unpkg.com/dayjs@1.8.36/plugin/relativeTime.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/handlebars@latest/dist/handlebars.js"></script>
+<script src="pureknob.js"></script>
 </head>
 <body>
     <h1>Rat-o-meter</h1>
@@ -24,9 +25,9 @@
                     <td>City</td>
                     <td>Num. stockists</td>
                     <td>Locations currently in stock</td>
-                    <td>Locations with stock in last 24 hours</td>
                     <td>Time for stock to run out</td>
                     <td>25th-75th percentile range</td>
+                    <td>Locations with stock in last 24 hours</td>
                 </tr>
             </thead>
             <tbody id="table-body-metro">
@@ -85,10 +86,10 @@
             <tr>
                 <td>{{ geo_city }}</td>
                 <td>{{ num_addresses }}</td>
-                <td>{{ percent_in_stock }}%</td>
-                <td>{{ percent_had_stock_last_24h }}%</td>
+                <td id="gauge-{{ geo_city }}-{{geo_state}}"></td>
                 <td>{{ out_of_stock_time_mins_median }} minutes</td>
                 <td>{{ out_of_stock_time_mins_prc25 }} to {{ out_of_stock_time_mins_prc75 }} minutes</td>
+                <td>{{ percent_had_stock_last_24h_round }}%</td>
             </tr>
             `);
 
@@ -96,8 +97,8 @@
             <tr>
                 <td>{{ geo_state }}</td>
                 <td>{{ num_addresses }}</td>
-                <td>{{ percent_in_stock }}%</td>
-                <td>{{ percent_had_stock_last_24h }}%</td>
+                <td id="gauge-{{ geo_city }}-{{geo_state}}"></td>
+                <td>{{ percent_had_stock_last_24h_round }}%</td>
             </tr>
             `);
 
@@ -111,8 +112,27 @@
                         dataMap[data[i]['geo_state']] = {}
                     }
                     dataMap[data[i]['geo_state']][data[i]['geo_city']] = data[i]
+                    data[i]['percent_had_stock_last_24h_round'] = Math.round(data[i]['percent_had_stock_last_24h'])
                 }
                 return dataMap
+            }
+
+            function addGauge(row) {
+                const knob = pureknob.createKnob(100, 100)
+                knob.setProperty('angleStart', -0.75 * Math.PI);
+                knob.setProperty('angleEnd', 0.75 * Math.PI);
+                knob.setProperty('colorFG', '#3333ff');
+                knob.setProperty('colorBG', '#aaaaaa');
+                knob.setProperty('trackWidth', 0.4);
+                knob.setProperty('valMin', 0);
+                knob.setProperty('valMax', 100);
+                knob.setProperty('readonly', true);
+                knob.setProperty('fnValueToString', (val) => Math.round(val).toString() + '%')
+
+                knob.setValue(row['percent_in_stock']);
+                // Create element node.
+                const node = knob.node();
+                document.getElementById(`gauge-${row['geo_city']}-${row['geo_state']}`).appendChild(node)
             }
 
             $.ajax({
@@ -136,6 +156,11 @@
                     tableRowsHtml = tableRows.reduce((a, b) => a + '\n' + b)
                     document.getElementById('table-body-metro').innerHTML = tableRowsHtml
 
+                    // Add gauges
+                    for (i=0; i < dataMetro.length; i++) {
+                        addGauge(dataMetro[i])
+                    }
+
                     dataNonMetro = [
                         dataMap['NSW']['Other'],
                         dataMap['VIC']['Other'],
@@ -146,6 +171,11 @@
                     tableRowsNonMetro = dataNonMetro.map(tableRowNonMetro)
                     tableRowsNonMetroHtml = tableRowsNonMetro.reduce((a, b) => a + '\n' + b)
                     document.getElementById('table-body-regional').innerHTML = tableRowsNonMetroHtml
+
+                    // Add gauges
+                    for (i=0; i < dataNonMetro.length; i++) {
+                        addGauge(dataNonMetro[i])
+                    }
 
                 }
             })
