@@ -1,5 +1,7 @@
 # RAT-o-meter website
 
+[Visit published website](https://aaronlecompte.github.io/rat-o-meter/)
+
 ## Introduction
 
 This repository hosts the frontend for the RAT-o-meter service to display aggergate 
