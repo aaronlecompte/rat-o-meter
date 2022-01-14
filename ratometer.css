@@ -1,5 +1,5 @@
 .rt-splash {
-    background: #dcc48e;
+    background: #C6DDF0;
     width: 100%;
     height: 88%;
     padding-top: 3em;
@@ -36,11 +36,11 @@
 .rt-splash td {
         font-size: 150%;
  font-weight: bold;
- color: #27233a;
+ color: #2B2D42;
 }
 
 .rt-splash h1 {
-    color: #27233a;
+    color: #2B2D42;
     margin-bottom: 0.1em;
 }
 

@@ -564,7 +564,7 @@
 					ctx.fillStyle = colorFilling;
 					ctx.textAlign = 'center';
 					ctx.textBaseline = 'middle';
-					ctx.fillText(valueStr, centerX, centerY);
+					ctx.fillText(valueStr, centerX, centerY*0.9);
 
 					/*
 					 * Draw the label
@@ -574,7 +574,7 @@
 						ctx.fillStyle = colorLabel;
 						ctx.textAlign = 'center';
 						ctx.textBaseline = 'middle';
-						ctx.fillText(label, centerX, labelY);
+						ctx.fillText(label, centerX, labelY*0.85);
 					}
 
 					/*

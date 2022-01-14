@@ -54,6 +54,9 @@
                 <td id="gauge-Perth-WA"></td>
             </tr>
         </table>
+        <p style="text-align: right; margin-right: 3em; font-style: italic;">
+        * Median time for location to run out stock
+        </p>
     </div>
 
     <div class="content-wrapper rt-more-info">
@@ -102,7 +105,7 @@
                 Metropolitan defined as locations within a 50km radius of city centre
             </li>
             <li>
-                Out-of-stock times measured as time from most recent restocking event to location being reported as out of stock. One measurement is recorded for each location and the median result is presented.
+                Out-of-stock times measured as time from most recent restocking event to location being reported as out of stock. One measurement is recorded for each location and the median result is presented. Locations still in stock are not included in this measure.
             </li>
             <li>
                 Locations classified by address entered by users.
@@ -173,13 +176,15 @@
                 const knob = pureknob.createKnob(gaugeSize, gaugeSize)
                 knob.setProperty('angleStart', -0.66 * Math.PI);
                 knob.setProperty('angleEnd', 0.66 * Math.PI);
-                knob.setProperty('colorFG', '#505168');
-                knob.setProperty('colorBG', '#dddddd');
+                knob.setProperty('colorFG', '#0A2463');
+                knob.setProperty('colorBG', '#eeeeee');
                 knob.setProperty('trackWidth', 0.3);
                 knob.setProperty('valMin', 0);
                 knob.setProperty('valMax', 100);
                 knob.setProperty('readonly', true);
                 knob.setProperty('fnValueToString', (val) => Math.round(val).toString() + '%')
+                knob.setProperty('label', row['out_of_stock_time_mins_median'] + " mins*")
+                knob.setProperty('colorLabel', '#0A2463')
 
                 knob.setValue(row['percent_in_stock']);
                 // Create element node.
