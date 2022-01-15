@@ -12,6 +12,7 @@
 <script src="https://unpkg.com/dayjs@1.8.36/plugin/relativeTime.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/handlebars@latest/dist/handlebars.js"></script>
 <script src="pureknob.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/purecss@2.0.6/build/pure-min.css" integrity="sha384-Uu6IeWbM+gzNVXJcM9XV3SohHtmWE+3VGi496jvgX1jyvDTXfdK+rfZc8C1Aehk5" crossorigin="anonymous">
 <link rel="stylesheet" href="https://unpkg.com/purecss@2.0.6/build/grids-responsive-min.css">
 <link rel="stylesheet" href="ratometer.css">
@@ -64,7 +65,7 @@
             </tr>
         </table>
         <p style="text-align: right; margin-right: 3em; font-style: italic;">
-        * Median time for location to run out stock
+        * Median time for location to run out stock (last 72 hours)
         </p>
     </div>
 
@@ -86,7 +87,7 @@
 
             </tbody>
         </table>
-
+        <p>&nbsp;</p>
         <h3>Non-metro locations</h3>
         <table class="pure-table pure-table-bordered">
             <thead>
@@ -101,6 +102,12 @@
 
             </tbody>
         </table>
+        <p>&nbsp;</p>
+        <h3>Restocking times</h3>
+        <p>Typical times locations are reported as having been restocked during the day (sample from last 72 hours)</p>
+        <div>
+            <canvas id="chartRestock" width="400" height="150"></canvas>
+        </div>
 
     </div>
 
@@ -114,13 +121,16 @@
                 Metropolitan defined as locations within a 50km radius of city centre
             </li>
             <li>
-                Out-of-stock times measured as time from most recent restocking event to location being reported as out of stock. One measurement is recorded for each location and the median result is presented. Locations still in stock are not included in this measure.
+                Out-of-stock times measured as time from most recent restocking event to location being reported as out of stock. One measurement is recorded for each location and the median result is presented. <b>Locations still in stock are not included in this measure.</b>
             </li>
             <li>
                 Locations classified by address entered by users.
             </li>
             <li>
                 Stock levels are reported by members of the public on a voluntary basis. This may not reflect actual stock levels at any location, and the metric measured here reflect information as available on findarat.com.au.
+            </li>
+            <li>
+                Population behaviour may strongly influence these results, including biases in times stock levels are recorded by members of the public.
             </li>
             <li>
                 Disclaimer: All measurements are based on data entered by members of the public into findarat.com.au and no validation of data has been performed. The data may contain inaccuracies, be incomplete or otherwise in error. No warranty is expressed or implied on the accuracy of this data and/or analysis for any particular purpose.
@@ -191,20 +201,78 @@
                 knob.setProperty('valMin', 0);
                 knob.setProperty('valMax', 100);
                 knob.setProperty('readonly', true);
-                knob.setProperty('fnValueToString', (val) => Math.round(val).toString() + '%')
-                knob.setProperty('label', row['out_of_stock_time_mins_median'] + " mins*")
+                if(row['out_of_stock_time_mins_median']) {
+                    knob.setProperty('fnValueToString', (val) => Math.round(val).toString() + '%')
+                    knob.setValue(row['percent_in_stock']);
+                } else {
+                    knob.setProperty('fnValueToString', (val) => 'N/A')
+                    knob.setValue(100);
+                    knob.setProperty('colorFG', '#bbbbbb');
+                }
+                knob.setProperty('label', (row['out_of_stock_time_mins_median'] || '--') + " mins*")
                 knob.setProperty('colorLabel', '#0A2463')
 
-                knob.setValue(row['percent_in_stock']);
+                
                 // Create element node.
                 const node = knob.node();
                 document.getElementById(`gauge-${row['geo_city']}-${row['geo_state']}`).appendChild(node)
             }
 
+            function drawChart(dataHours) {
+                const ctx = document.getElementById('chartRestock').getContext('2d');
+
+                var dataHoursMap = dataHours.reduce(function(map, obj) {
+                    map[obj['date_hour']] = obj['num_events'];
+                    return map;
+                }, {});
+
+                labels = []
+                dataPoints = []
+                for (i=1; i<=24; i++) {
+                    if (i > 12) {
+                        labels.push((i-12) + 'pm')
+                    } else if (i == 12) {
+                        labels.push('12pm')
+                    } else {
+                        labels.push(i + 'am')
+                    }
+                    dataPoints.push(dataHoursMap[i] || 0)
+                }
+
+                const myChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: dataPoints,
+                            backgroundColor: '#0A246399'
+                        }]
+                    },
+                    options: {
+                        parsing: {
+                            xAxisKey: 'date_hour',
+                            yAxisKey: 'num_events'
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+            }
+
             $.ajax({
-                url: 'https://ratometer-public.s3.ap-southeast-2.amazonaws.com/data/latest.json?dt=' + (new Date()).getTime(),
+                url: 'https://ratometer-public.s3.ap-southeast-2.amazonaws.com/data/latest_v2.json?dt=' + (new Date()).getTime(),
                 success: function(dataRaw) {
-                    data = JSON.parse(dataRaw)
+                    dataAll = JSON.parse(dataRaw)
+                    data = dataAll['summary']
+                    dataHours = dataAll['stock_hours']
                     updatedTime = dayjs.tz(data[0].query_time, 'UTC')
                     document.getElementById('last-updated').innerHTML = updatedTime.fromNow()
 
@@ -237,6 +305,8 @@
                     tableRowsNonMetro = dataNonMetro.map(tableRowNonMetro)
                     tableRowsNonMetroHtml = tableRowsNonMetro.reduce((a, b) => a + '\n' + b)
                     document.getElementById('table-body-regional').innerHTML = tableRowsNonMetroHtml
+
+                    drawChart(dataHours)
 
                 }
             })
