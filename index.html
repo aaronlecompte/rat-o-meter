@@ -296,7 +296,7 @@
             function updateDisplay(timestamp, isInit) {
                 $.ajax({
                     //url: 'https://ratometer-public.s3.ap-southeast-2.amazonaws.com/data/latest_v2.json?dt=' + (new Date()).getTime(),
-                    url: `/location_data/data/results_v2_${timestamp}.json`,
+                    url: `location_data/data/results_v2_${timestamp}.json`,
                     dataType: 'json',
                     success: function(dataAll) {
                         data = dataAll['summary']
