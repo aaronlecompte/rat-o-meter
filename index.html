@@ -11,11 +11,17 @@
 <script src="https://unpkg.com/dayjs@1.8.36/plugin/timezone.js"></script>
 <script src="https://unpkg.com/dayjs@1.8.36/plugin/relativeTime.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/handlebars@latest/dist/handlebars.js"></script>
-<script src="pureknob.js"></script>
+<script src="/scripts/pureknob.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/jquery/latest/jquery.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
+
 <link rel="stylesheet" href="https://unpkg.com/purecss@2.0.6/build/pure-min.css" integrity="sha384-Uu6IeWbM+gzNVXJcM9XV3SohHtmWE+3VGi496jvgX1jyvDTXfdK+rfZc8C1Aehk5" crossorigin="anonymous">
 <link rel="stylesheet" href="https://unpkg.com/purecss@2.0.6/build/grids-responsive-min.css">
-<link rel="stylesheet" href="ratometer.css">
+<link rel="stylesheet" href="/css/ratometer.css">
+
 <!-- Global site tag (gtag.js) - Google Analytics -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-WSVR9XDZVE"></script>
 <script>
@@ -39,7 +45,12 @@
 
     <div class="content-wrapper rt-splash">
         <h1>Retail locations with RATs in stock</h1>
-        <p style="margin-top: 0.1em; margin-bottom: 0.1em;">Last updated: <span id="last-updated"></span></p>
+
+        <p><strong>Historical data view - select a date below</strong></p> 
+        <p>
+            Showing status as at: <input id="datetimepicker" type="text">
+        </p>
+
         <p style="margin-top: 0.1em; margin-bottom: 2em;">Data sourced from <a href="https://findarat.com.au" target="_blank">https://findarat.com.au</a></p>
         
         <table> 
@@ -144,6 +155,8 @@
 
     
     <script type="text/javascript">
+        knobs = {}
+        myChart = null
         $(document).ready(function() {
 
             dayjs.extend(window.dayjs_plugin_utc)
@@ -192,6 +205,21 @@
                 return dataMap
             }
 
+            function adjustGauge(row) {
+                knobId = `gauge-${row['geo_city']}-${row['geo_state']}`
+                knob = knobs[knobId]
+                if(row['out_of_stock_time_mins_median']) {
+                    knob.setProperty('fnValueToString', (val) => Math.round(val).toString() + '%')
+                    knob.setValue(row['percent_in_stock']);
+                    knob.setProperty('colorFG', '#0A2463');
+                } else {
+                    knob.setProperty('fnValueToString', (val) => '100%')
+                    knob.setValue(100);
+                    //knob.setProperty('colorFG', '#bbbbbb');
+                }
+                knob.setProperty('label', (row['out_of_stock_time_mins_median'] || '--') + " mins*")
+            }
+
             function addGauge(row) {
 
                 const knob = pureknob.createKnob(gaugeSize, gaugeSize)
@@ -203,21 +231,13 @@
                 knob.setProperty('valMin', 0);
                 knob.setProperty('valMax', 100);
                 knob.setProperty('readonly', true);
-                if(row['out_of_stock_time_mins_median']) {
-                    knob.setProperty('fnValueToString', (val) => Math.round(val).toString() + '%')
-                    knob.setValue(row['percent_in_stock']);
-                } else {
-                    knob.setProperty('fnValueToString', (val) => 'N/A')
-                    knob.setValue(100);
-                    knob.setProperty('colorFG', '#bbbbbb');
-                }
-                knob.setProperty('label', (row['out_of_stock_time_mins_median'] || '--') + " mins*")
                 knob.setProperty('colorLabel', '#0A2463')
 
-                
                 // Create element node.
+                knobId = `gauge-${row['geo_city']}-${row['geo_state']}`
                 const node = knob.node();
-                document.getElementById(`gauge-${row['geo_city']}-${row['geo_state']}`).appendChild(node)
+                document.getElementById(knobId).appendChild(node)
+                knobs[knobId] = knob
             }
 
             function drawChart(dataHours) {
@@ -241,7 +261,11 @@
                     dataPoints.push(dataHoursMap[i] || 0)
                 }
 
-                const myChart = new Chart(ctx, {
+                if (myChart) {
+                    myChart.destroy()
+                }
+
+                myChart = new Chart(ctx, {
                     type: 'bar',
                     data: {
                         labels: labels,
@@ -269,50 +293,72 @@
                 });
             }
 
-            $.ajax({
-                url: 'https://ratometer-public.s3.ap-southeast-2.amazonaws.com/data/latest_v2.json?dt=' + (new Date()).getTime(),
-                success: function(dataRaw) {
-                    dataAll = JSON.parse(dataRaw)
-                    data = dataAll['summary']
-                    dataHours = dataAll['stock_hours']
-                    updatedTime = dayjs.tz(data[0].query_time, 'UTC')
-                    document.getElementById('last-updated').innerHTML = updatedTime.fromNow()
+            function updateDisplay(timestamp, isInit) {
+                $.ajax({
+                    //url: 'https://ratometer-public.s3.ap-southeast-2.amazonaws.com/data/latest_v2.json?dt=' + (new Date()).getTime(),
+                    url: `/location_data/data/results_v2_${timestamp}.json`,
+                    dataType: 'json',
+                    success: function(dataAll) {
+                        data = dataAll['summary']
+                        dataHours = dataAll['stock_hours']
 
-                    dataMap = indexData(data)
+                        dataMap = indexData(data)
 
-                    dataMetro = [
-                        dataMap['NSW']['Sydney'],
-                        dataMap['VIC']['Melbourne'],
-                        dataMap['QLD']['Brisbane'],
-                        dataMap['SA']['Adelaide'],
-                        dataMap['WA']['Perth'],
-                        dataMap['ACT']['Canberra']
-                    ]
-                    tableRows = dataMetro.map(tableRow)
-                    tableRowsHtml = tableRows.reduce((a, b) => a + '\n' + b)
-                    document.getElementById('table-body-metro').innerHTML = tableRowsHtml
+                        dataMetro = [
+                            dataMap['NSW']['Sydney'],
+                            dataMap['VIC']['Melbourne'],
+                            dataMap['QLD']['Brisbane'],
+                            dataMap['SA']['Adelaide'],
+                            dataMap['WA']['Perth'],
+                            dataMap['ACT']['Canberra']
+                        ]
+                        tableRows = dataMetro.map(tableRow)
+                        tableRowsHtml = tableRows.reduce((a, b) => a + '\n' + b)
+                        document.getElementById('table-body-metro').innerHTML = tableRowsHtml
 
-                    // Add gauges
-                    for (i=0; i < dataMetro.length; i++) {
-                        addGauge(dataMetro[i])
+                        // Add gauges
+                        for (i=0; i < dataMetro.length; i++) {
+                            if (isInit) {
+                                addGauge(dataMetro[i])
+                            }
+                            adjustGauge(dataMetro[i])
+                        }
+
+                        dataNonMetro = [
+                            dataMap['NSW']['Other'],
+                            dataMap['VIC']['Other'],
+                            dataMap['QLD']['Other'],
+                            dataMap['SA']['Other'],
+                            dataMap['WA']['Other']
+                        ]
+                        tableRowsNonMetro = dataNonMetro.map(tableRowNonMetro)
+                        tableRowsNonMetroHtml = tableRowsNonMetro.reduce((a, b) => a + '\n' + b)
+                        document.getElementById('table-body-regional').innerHTML = tableRowsNonMetroHtml
+
+                        drawChart(dataHours)
+
                     }
+                })
+            }
 
-                    dataNonMetro = [
-                        dataMap['NSW']['Other'],
-                        dataMap['VIC']['Other'],
-                        dataMap['QLD']['Other'],
-                        dataMap['SA']['Other'],
-                        dataMap['WA']['Other']
-                    ]
-                    tableRowsNonMetro = dataNonMetro.map(tableRowNonMetro)
-                    tableRowsNonMetroHtml = tableRowsNonMetro.reduce((a, b) => a + '\n' + b)
-                    document.getElementById('table-body-regional').innerHTML = tableRowsNonMetroHtml
-
-                    drawChart(dataHours)
-
-                }
+            updateDisplay('202201161400', true)
+            
+            $('#datetimepicker').daterangepicker({
+                singleDatePicker: true,
+                timePicker: true,
+                timePicker24Hour: true,
+                autoApply: true,
+                locale: {
+                    'format': 'DD/MM/YYYY HH:mm'
+                },
+                minDate: '16/01/2022 00:00',
+                maxDate: '22/02/2022 23:00',
+                startDate: '16/01/2022 14:00'
+            }, function(start, end, label) {
+                timestamp = start.format('YYYYMMDDHHmm')
+                console.log('Selected: ' + timestamp)
+                updateDisplay(timestamp, false)
             })
-
         })
     </script>
 </body>
